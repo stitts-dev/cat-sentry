@@ -11,5 +11,5 @@ events/
 config.local.yaml
 *.pt
 *.onnx
-detection/tests/fixtures/
+detection/tests/fixtures/*.webm
 *.mp4

@@ -1,12 +1,13 @@
 """config.yaml loading + validation.
 
 Validates every field named in docs/design.md (source, broker, zones,
-thresholds, rate_limits, flags, ntfy) even though the C1 tracer CLI only
+thresholds, rate_limits, flags, ntfy). catsentry.zones/catsentry.dwell (C2)
+consume `zones` and `thresholds.dwell_seconds`; the C1 tracer CLI only
 consumes `source.url` so far.
 
-# ponytail: broker/thresholds/rate_limits/flags/ntfy are validated but not
-# wired to anything yet -- the zone engine, dwell/squat state machine, and
-# deterrent policy land in later issues (C2+) and will consume them then.
+# ponytail: broker/rate_limits/flags/ntfy and the rest of thresholds are
+# validated but not wired to anything yet -- the squat state machine and
+# deterrent policy land in a later issue (C3+) and will consume them then.
 """
 
 from __future__ import annotations
@@ -16,7 +17,7 @@ from pathlib import Path
 
 import yaml
 
-REQUIRED_ZONES = ("boxes", "floor_left", "floor_right")
+from catsentry.zones import REQUIRED_ZONES
 
 
 class ConfigError(ValueError):
