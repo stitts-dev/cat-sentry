@@ -50,8 +50,33 @@ uv run pytest                # fast tests only (config validation etc.)
 uv run pytest -m integration # + real YOLO inference on the downloaded fixtures
 ```
 
-Currently implemented: video/webcam/stream -> pretrained YOLO + ByteTrack ->
-per-frame cat detections (COCO class `cat`) with stable track IDs and
-confidences, plus `config.yaml` loading/validation for the full schema in
-[docs/design.md](docs/design.md). Zones, the dwell/squat state machine, MQTT
-publishing, and the deterrent policy are later issues.
+That `catsentry` command is just the C1 tracer CLI (detect+track, print
+detections). The full service -- ingest -> zones -> dwell/squat state
+machine -> deterrent policy -> SQLite store + ntfy alerts + MQTT -- runs as
+`catsentry-serve`:
+
+```
+cp config.sample.yaml config.local.yaml   # edit source.url, zones, thresholds, ntfy topic
+uv run catsentry-serve --config config.local.yaml            # runs until Ctrl+C/SIGTERM
+uv run catsentry-serve --config config.local.yaml --verbose  # DEBUG logging
+uv run catsentry-serve --config config.local.yaml --loop     # restart a finite source (a
+                                                               # video file) when it ends,
+                                                               # for soak-testing a short clip
+```
+
+`config.local.yaml`'s `source.url` can be a video file, webcam index, or
+stream URL (MJPEG worldsim endpoint or RTSP camera) -- same swap rule as the
+contract. `flags.deterrent_enabled: false` (the shipped default) is
+detection-only mode: `catsentry/event`s and SQLite/ntfy/MQTT logging all
+still happen, but zero `catsentry/deterrent/fire` commands are ever sent.
+Set it `true` once you're ready for the sound/air deterrent to actually fire.
+Shutdown (Ctrl+C or SIGTERM) flushes any queued events/fires before closing
+the store and MQTT connection.
+
+Currently implemented: the full detection pipeline described in
+[docs/design.md](docs/design.md) -- video/webcam/stream ingest with
+reconnect, pretrained YOLO + ByteTrack cat detection/tracking, zone/dwell
+state machine, squat heuristic + sound/air deterrent policy with hard safety
+rails, SQLite event store + JPEG snapshots, ntfy push alerts, and MQTT
+publishing -- composed into one long-running `catsentry-serve` process.
+Per-cat ID and the Raspberry Pi edge port are phase 2 (see design doc).
