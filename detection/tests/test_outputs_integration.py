@@ -10,6 +10,7 @@ Skipped by default (see pyproject.toml's `-m 'not integration'`). To run:
 from __future__ import annotations
 
 import json
+import os
 import socket
 import time
 
@@ -18,7 +19,11 @@ import pytest
 from catsentry.config import BrokerConfig
 from catsentry.outputs import TOPIC_DETERRENT_FIRE, TOPIC_EVENT, MqttPublisher
 
-BROKER = BrokerConfig(host="localhost", port=1883)
+# ponytail: CATSENTRY_TEST_BROKER_PORT override exists because Windows WinNAT
+# reserves a dynamic range that swallows 1883 on some machines; the contract
+# port stays 1883, only this test's broker is relocatable.
+_PORT = int(os.environ.get("CATSENTRY_TEST_BROKER_PORT", "1883"))
+BROKER = BrokerConfig(host="localhost", port=_PORT)
 
 
 def _broker_reachable() -> bool:
