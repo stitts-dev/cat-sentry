@@ -16,9 +16,11 @@ nothing was ever announced. Once confirmed, leaving the zone (by moving
 elsewhere or by the track disappearing for too long) fires zone_exit
 immediately; there's no debounce on the way out.
 
-# ponytail: this only builds IDLE <-> IN_ZONE. SUSPECT/WARNED/ESCALATED/
-# COOLDOWN (squat heuristic, sound/air firing, cooldown) are C3 (#4) -- it
-# extends DwellEngine/_TrackState here rather than replacing them.
+# ponytail: this module only builds IDLE <-> IN_ZONE. SUSPECT/WARNED/
+# ESCALATED/COOLDOWN (squat heuristic, sound/air firing, cooldown, safety
+# rails) are catsentry.policy (C3, #4) -- it composes a DwellEngine rather
+# than replacing this one, reusing `dwell_seconds`/`confirmed_zone` as its
+# only window into per-track zone state.
 """
 
 from __future__ import annotations
@@ -51,15 +53,20 @@ class _TrackState:
     missing_frames: int = 0
 
 
-def _format_ts(ts: datetime) -> str:
+def format_ts(ts: datetime) -> str:
     """ISO 8601 UTC, contract format: '2026-08-19T21:04:00Z' (no
-    microseconds, 'Z' rather than '+00:00')."""
+    microseconds, 'Z' rather than '+00:00'). Public -- C3's policy.py reuses
+    this for squat_suspected/deterrent_fired events and fire commands rather
+    than re-deriving the contract's timestamp format."""
     return ts.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _event(event_type: str, *, zone: str, detection: Detection, ts: datetime) -> dict:
+def build_event(event_type: str, *, zone: str, detection: Detection, ts: datetime) -> dict:
+    """Shape a catsentry/event payload. Public for the same reason as
+    `format_ts` -- policy.py's squat_suspected/deterrent_fired events are the
+    same shape as this module's zone_enter/zone_exit."""
     return {
-        "ts": _format_ts(ts),
+        "ts": format_ts(ts),
         "type": event_type,
         "cat_id": None,  # per-cat ID is phase 2 (contract v1)
         "zone": zone,
@@ -98,6 +105,17 @@ class DwellEngine:
             return None
         return (now - state.entered_at).total_seconds()
 
+    def confirmed_zone(self, track_id: int) -> str | None:
+        """Which zone `track_id` is currently confirmed IN_ZONE for, or None
+        if it's unknown or still just a candidate. Exposed alongside
+        `dwell_seconds` for the same reason: C3's policy layer gates the
+        squat heuristic on "is this track IN_ZONE at all" without
+        re-deriving zone membership itself."""
+        state = self._tracks.get(track_id)
+        if state is None:
+            return None
+        return state.confirmed_zone
+
     def update(self, ts: datetime, detections: list[Detection]) -> list[dict]:
         events: list[dict] = []
         seen_ids = {d.track_id for d in detections if d.track_id is not None}
@@ -111,7 +129,7 @@ class DwellEngine:
             if state.missing_frames > self._max_missing_frames:
                 if state.confirmed_zone is not None and state.last_detection is not None:
                     events.append(
-                        _event(
+                        build_event(
                             EVENT_ZONE_EXIT,
                             zone=state.confirmed_zone,
                             detection=state.last_detection,
@@ -135,7 +153,7 @@ class DwellEngine:
 
         if state.confirmed_zone is not None and raw_zone != state.confirmed_zone:
             events.append(
-                _event(
+                build_event(
                     EVENT_ZONE_EXIT,
                     zone=state.confirmed_zone,
                     detection=state.last_detection,
@@ -163,7 +181,7 @@ class DwellEngine:
                     state.confirmed_zone = raw_zone
                     state.entered_at = state.candidate_since
                     events.append(
-                        _event(
+                        build_event(
                             EVENT_ZONE_ENTER,
                             zone=raw_zone,
                             detection=state.candidate_detection,

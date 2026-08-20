@@ -1,0 +1,14 @@
+[
+  {"ts": "2026-08-19T00:00:00Z", "detections": [{"track_id": 1, "confidence": 0.90, "bbox": [0.15, 0.65, 0.10, 0.05]}]},
+  {"ts": "2026-08-19T00:00:01Z", "detections": [{"track_id": 1, "confidence": 0.90, "bbox": [0.15, 0.65, 0.10, 0.05]}]},
+  {"ts": "2026-08-19T00:00:02Z", "detections": [{"track_id": 1, "confidence": 0.90, "bbox": [0.15, 0.65, 0.10, 0.05]}]},
+  {"ts": "2026-08-19T00:00:03Z", "detections": [{"track_id": 1, "confidence": 0.90, "bbox": [0.15, 0.65, 0.10, 0.05]}]},
+  {"ts": "2026-08-19T00:00:04Z", "detections": [{"track_id": 1, "confidence": 0.90, "bbox": [0.15, 0.65, 0.10, 0.05]}]},
+  {"ts": "2026-08-19T00:00:05Z", "detections": [{"track_id": 1, "confidence": 0.90, "bbox": [0.15, 0.65, 0.10, 0.05]}]},
+  {"ts": "2026-08-19T00:00:06Z", "detections": [{"track_id": 1, "confidence": 0.90, "bbox": [0.15, 0.65, 0.10, 0.05]}]},
+  {"ts": "2026-08-19T00:00:07Z", "detections": [{"track_id": 1, "confidence": 0.90, "bbox": [0.15, 0.65, 0.10, 0.05]}]},
+  {"ts": "2026-08-19T00:00:08Z", "detections": [{"track_id": 1, "confidence": 0.90, "bbox": [0.15, 0.65, 0.10, 0.05]}]},
+  {"ts": "2026-08-19T00:00:09Z", "detections": [{"track_id": 1, "confidence": 0.90, "bbox": [0.15, 0.65, 0.10, 0.05]}]},
+  {"ts": "2026-08-19T00:00:10Z", "detections": [{"track_id": 1, "confidence": 0.90, "bbox": [0.15, 0.65, 0.10, 0.05]}]},
+  {"ts": "2026-08-19T00:00:11Z", "detections": [{"track_id": 1, "confidence": 0.90, "bbox": [0.15, 0.65, 0.10, 0.05]}]}
+]
