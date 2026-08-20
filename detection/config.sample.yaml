@@ -1,0 +1,55 @@
+# Sample catsentry config. Copy to config.local.yaml (gitignored) and edit.
+#
+# All fields below are validated by catsentry.config.load_config, but the C1
+# tracer CLI only reads `source.url` so far -- everything else is here so the
+# schema is nailed down before the zone engine / state machine / deterrent
+# policy (later issues) start consuming it. See docs/design.md.
+
+source:
+  # Video file path, webcam index (as a string, e.g. "0"), or stream URL.
+  # In the digital-twin setup this is the worldsim MJPEG endpoint; swapping
+  # to a real camera later is a one-line change (see docs/contract-catsentry-v1.md).
+  url: "http://localhost:8089/stream"
+
+broker:
+  host: "localhost"
+  port: 1883
+
+# Named polygons in normalized [0,1] frame coordinates, origin top-left.
+# `boxes` = the litterboxes themselves; the deterrent policy must never
+# target this zone. `floor_left` / `floor_right` are the problem areas
+# beside the boxes. All three are required.
+zones:
+  boxes:
+    - [0.35, 0.55]
+    - [0.60, 0.55]
+    - [0.60, 0.95]
+    - [0.35, 0.95]
+  floor_left:
+    - [0.05, 0.55]
+    - [0.35, 0.55]
+    - [0.35, 0.95]
+    - [0.05, 0.95]
+  floor_right:
+    - [0.60, 0.55]
+    - [0.90, 0.55]
+    - [0.90, 0.95]
+    - [0.60, 0.95]
+
+thresholds:
+  confidence: 0.5          # YOLO detection confidence, (0, 1]
+  dwell_seconds: 2.0       # time in a zone before IN_ZONE -> SUSPECT is even considered
+  squat_seconds: 3.0       # squat heuristic must hold this long to fire SUSPECT
+  squat_aspect_ratio: 0.6  # bbox height/width below this looks like a squat
+  centroid_epsilon: 0.02   # max centroid displacement (normalized) to still count as still
+  escalate_seconds: 5.0    # SUSPECT persists this long after sound -> air
+
+rate_limits:
+  max_fires_per_hour: 4
+  cooldown_minutes: 15
+
+flags:
+  deterrent_enabled: false  # detection/logging only until explicitly turned on
+
+ntfy:
+  topic: "catsentry-alerts"
