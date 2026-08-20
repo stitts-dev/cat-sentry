@@ -30,3 +30,28 @@ Pre-hardware. Spec'd, building detection service against the sim. $0 spent.
 
 Python 3.11+, ultralytics YOLO, OpenCV, paho-mqtt, SQLite, ntfy. Prototype runs
 on an RTX 4090; phase 2 ports a quantized model to a Raspberry Pi 5 edge box.
+
+## Detection service
+
+The Python service lives in [`detection/`](detection/), `uv`-managed.
+
+```
+cd detection
+uv sync
+uv run python scripts/download_fixtures.py   # grabs 2 short CC cat clips for local testing
+uv run catsentry tests/fixtures/cat_laser_pointer.webm --show
+uv run catsentry tests/fixtures/cat_laser_pointer.webm --save out.mp4
+uv run catsentry 0                            # webcam index
+uv run catsentry http://localhost:8089/stream # worldsim / RTSP stream URL
+uv run catsentry --config config.sample.yaml  # source.url from config
+
+uv run ruff check .
+uv run pytest                # fast tests only (config validation etc.)
+uv run pytest -m integration # + real YOLO inference on the downloaded fixtures
+```
+
+Currently implemented: video/webcam/stream -> pretrained YOLO + ByteTrack ->
+per-frame cat detections (COCO class `cat`) with stable track IDs and
+confidences, plus `config.yaml` loading/validation for the full schema in
+[docs/design.md](docs/design.md). Zones, the dwell/squat state machine, MQTT
+publishing, and the deterrent policy are later issues.
