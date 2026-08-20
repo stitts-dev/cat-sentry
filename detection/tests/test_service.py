@@ -15,8 +15,9 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import numpy as np
+from helpers import det, fast_thresholds
 
-from catsentry.config import FlagsConfig, RateLimitsConfig, ThresholdsConfig, load_config
+from catsentry.config import FlagsConfig, RateLimitsConfig, load_config
 from catsentry.policy import FirePolicy
 from catsentry.replay import load_sequence
 from catsentry.service import (
@@ -39,37 +40,24 @@ FAST_ZONES = {"zone_a": [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)]}
 FRAME = np.zeros((2, 2, 3), dtype=np.uint8)
 
 
-def _fast_thresholds(**overrides) -> ThresholdsConfig:
-    base = dict(
-        confidence=0.5,
-        dwell_seconds=0.5,
-        squat_seconds=0.5,
-        squat_aspect_ratio=0.6,
-        centroid_epsilon=0.02,
-        escalate_seconds=1000.0,  # never escalate -- keep these scenarios sound-only
-    )
-    base.update(overrides)
-    return ThresholdsConfig(**base)
-
-
 def _policy(*, deterrent_enabled: bool) -> FirePolicy:
     return FirePolicy(
         ZoneMap(FAST_ZONES),
-        _fast_thresholds(),
+        fast_thresholds(
+            dwell_seconds=0.5,
+            squat_seconds=0.5,
+            escalate_seconds=1000.0,  # never escalate -- keep these scenarios sound-only
+        ),
         RateLimitsConfig(max_fires_per_hour=10, cooldown_minutes=0.01),
         FlagsConfig(deterrent_enabled=deterrent_enabled),
         max_missing_frames=1,
     )
 
 
-def det(track_id: int, bbox=(0.1, 0.1, 0.1, 0.05)) -> Detection:
-    return Detection(frame_idx=0, track_id=track_id, confidence=0.9, bbox=bbox)
-
-
 def _squat_frames() -> list[list[Detection]]:
     """Same shape as squat_escalation_sequence.json's detections, minus ts
     (the fake clock below supplies those) -- enough frames of a still,
-    squat-shaped bbox to reach SUSPECT under `_fast_thresholds`."""
+    squat-shaped bbox to reach SUSPECT under `fast_thresholds`."""
     sequence = load_sequence(FIXTURES / "squat_escalation_sequence.json")
     return [
         [

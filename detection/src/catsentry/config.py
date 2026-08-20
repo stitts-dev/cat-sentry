@@ -1,13 +1,13 @@
 """config.yaml loading + validation.
 
 Validates every field named in docs/design.md (source, broker, zones,
-thresholds, rate_limits, flags, ntfy, store). catsentry.zones/catsentry.dwell (C2)
-consume `zones` and `thresholds.dwell_seconds`; the C1 tracer CLI only
-consumes `source.url` so far.
-
-# ponytail: broker/rate_limits/flags/ntfy and the rest of thresholds are
-# validated but not wired to anything yet -- the squat state machine and
-# deterrent policy land in a later issue (C3+) and will consume them then.
+thresholds, rate_limits, flags, ntfy, store) -- and every field is wired up
+by now: catsentry.zones/catsentry.dwell consume `zones` and
+`thresholds.dwell_seconds`; catsentry.policy adds the rest of `thresholds`
+(squat_*, escalate_seconds), `rate_limits`, and `flags.deterrent_enabled`;
+catsentry.service composes a full `Config` into the running pipeline --
+`store` into EventStore, `ntfy` into NtfyNotifier, `broker` into
+MqttPublisher. The C1 tracer CLI still only consumes `source.url`.
 """
 
 from __future__ import annotations

@@ -1,11 +1,8 @@
-from datetime import UTC, datetime, timedelta
+from helpers import det, ts
 
 from catsentry.config import ThresholdsConfig
 from catsentry.dwell import DwellEngine
-from catsentry.tracer import Detection
 from catsentry.zones import ZoneMap
-
-BASE_TS = datetime(2026, 8, 19, 0, 0, 0, tzinfo=UTC)
 
 ZONE_A = [(0.0, 0.0), (0.5, 0.0), (0.5, 1.0), (0.0, 1.0)]
 ZONE_B = [(0.5, 0.0), (1.0, 0.0), (1.0, 1.0), (0.5, 1.0)]
@@ -14,16 +11,6 @@ ZONES = {"zone_a": ZONE_A, "zone_b": ZONE_B}
 BBOX_A = (0.1, 0.4, 0.1, 0.1)  # bottom-center (0.15, 0.5) -> zone_a
 BBOX_B = (0.6, 0.4, 0.1, 0.1)  # bottom-center (0.65, 0.5) -> zone_b
 BBOX_NONE = (0.1, 1.2, 0.05, 0.05)  # bottom-center (0.125, 1.25) -> outside both
-
-
-def ts(seconds: float) -> datetime:
-    return BASE_TS + timedelta(seconds=seconds)
-
-
-def det(
-    track_id: int, bbox: tuple[float, float, float, float], confidence: float = 0.9
-) -> Detection:
-    return Detection(frame_idx=0, track_id=track_id, confidence=confidence, bbox=bbox)
 
 
 def make_engine(dwell_seconds: float = 2.0, max_missing_frames: int = 1) -> DwellEngine:

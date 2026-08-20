@@ -12,10 +12,11 @@ acceptance criteria:
 
 import random
 from dataclasses import replace
-from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from catsentry.config import FlagsConfig, RateLimitsConfig, ThresholdsConfig, load_config
+from helpers import det, fast_thresholds, ts
+
+from catsentry.config import FlagsConfig, RateLimitsConfig, load_config
 from catsentry.policy import EVENT_DETERRENT_FIRED, EVENT_SQUAT_SUSPECTED, FirePolicy, TrackState
 from catsentry.replay import load_sequence, replay_policy
 from catsentry.tracer import Detection
@@ -23,18 +24,6 @@ from catsentry.zones import PROTECTED_ZONE, ZoneMap, bbox_bottom_center, point_i
 
 SAMPLE_CONFIG = Path(__file__).resolve().parent.parent / "config.sample.yaml"
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
-
-BASE_TS = datetime(2026, 8, 19, 0, 0, 0, tzinfo=UTC)
-
-
-def ts(seconds: float) -> datetime:
-    return BASE_TS + timedelta(seconds=seconds)
-
-
-def det(
-    track_id: int, bbox: tuple[float, float, float, float], confidence: float = 0.9
-) -> Detection:
-    return Detection(frame_idx=0, track_id=track_id, confidence=confidence, bbox=bbox)
 
 
 def _event_types(events: list[dict]) -> list[str]:
@@ -119,21 +108,8 @@ FAST_ZONES = {"zone_a": [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)]}
 SQUAT_BBOX = (0.1, 0.1, 0.1, 0.05)  # ratio 0.5, stationary centroid
 
 
-def _fast_thresholds(**overrides) -> ThresholdsConfig:
-    base = dict(
-        confidence=0.5,
-        dwell_seconds=1.0,
-        squat_seconds=1.0,
-        squat_aspect_ratio=0.6,
-        centroid_epsilon=0.02,
-        escalate_seconds=1.0,
-    )
-    base.update(overrides)
-    return ThresholdsConfig(**base)
-
-
 def test_global_cooldown_blocks_a_different_tracks_sound_fire():
-    thresholds = _fast_thresholds()
+    thresholds = fast_thresholds()
     rate_limits = RateLimitsConfig(max_fires_per_hour=10, cooldown_minutes=5.0)
     flags = FlagsConfig(deterrent_enabled=True)
     policy = FirePolicy(ZoneMap(FAST_ZONES), thresholds, rate_limits, flags, max_missing_frames=1)
@@ -174,7 +150,7 @@ def test_global_cooldown_blocks_a_different_tracks_sound_fire():
 def test_hourly_cap_enforced_across_many_independent_episodes():
     """Property-style: however many separate squat episodes occur inside a
     rolling hour, the number of fires never exceeds max_fires_per_hour."""
-    thresholds = _fast_thresholds(escalate_seconds=1000.0)  # never escalate -- sound-only episodes
+    thresholds = fast_thresholds(escalate_seconds=1000.0)  # never escalate -- sound-only episodes
     max_fires_per_hour = 3
     rate_limits = RateLimitsConfig(max_fires_per_hour=max_fires_per_hour, cooldown_minutes=0.01)
     flags = FlagsConfig(deterrent_enabled=True)
@@ -198,7 +174,7 @@ def test_hourly_cap_enforced_across_many_independent_episodes():
 
 
 def test_rail_violation_reasons_are_specific():
-    thresholds = _fast_thresholds()
+    thresholds = fast_thresholds()
     rate_limits = RateLimitsConfig(max_fires_per_hour=1, cooldown_minutes=5.0)
 
     disabled = FirePolicy(
@@ -216,7 +192,7 @@ def test_rail_violation_reasons_are_specific():
 
 
 def test_reset_clears_per_track_state_but_preserves_global_rate_limit_history():
-    thresholds = _fast_thresholds()  # dwell=1, squat=1
+    thresholds = fast_thresholds()  # dwell=1, squat=1
     rate_limits = RateLimitsConfig(max_fires_per_hour=10, cooldown_minutes=5.0)
     flags = FlagsConfig(deterrent_enabled=True)
     policy = FirePolicy(ZoneMap(FAST_ZONES), thresholds, rate_limits, flags, max_missing_frames=1)

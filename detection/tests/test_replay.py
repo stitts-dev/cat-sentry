@@ -4,12 +4,19 @@ detection sequence covering debounced entry, a same-frame zone-to-zone
 transition, disappearance-triggered exit, and disappear/reappear as a fresh
 visit -- see tests/fixtures/replay_sequence.json for the frame-by-frame
 scenario.
+
+Driven through `replay_policy` (detection-only, flags.deterrent_enabled=False)
+rather than the old DwellEngine-only `replay` -- config.sample.yaml's
+shipped bboxes are square (aspect ratio 1.0, never squat-shaped), so
+FirePolicy never opens a squat candidacy here and the zone_enter/zone_exit
+stream is identical to what bare DwellEngine would have produced; `fires`
+stays empty either way since deterrent_enabled is off.
 """
 
 from pathlib import Path
 
 from catsentry.config import load_config
-from catsentry.replay import load_sequence, replay
+from catsentry.replay import load_sequence, replay_policy
 
 SAMPLE_CONFIG = Path(__file__).resolve().parent.parent / "config.sample.yaml"
 SEQUENCE = Path(__file__).resolve().parent / "fixtures" / "replay_sequence.json"
@@ -78,8 +85,12 @@ EXPECTED_EVENTS = [
 
 def test_golden_replay_produces_exact_expected_event_stream():
     cfg = load_config(SAMPLE_CONFIG)  # dwell_seconds=2.0, real zone polygons
+    assert cfg.flags.deterrent_enabled is False  # detection-only -- the shipped default
     sequence = load_sequence(SEQUENCE)
 
-    events = replay(cfg.zones, cfg.thresholds, sequence, max_missing_frames=1)
+    result = replay_policy(
+        cfg.zones, cfg.thresholds, cfg.rate_limits, cfg.flags, sequence, max_missing_frames=1
+    )
 
-    assert events == EXPECTED_EVENTS
+    assert result.events == EXPECTED_EVENTS
+    assert result.fires == []

@@ -10,11 +10,11 @@ Sequence format -- a JSON list of frames, oldest first:
   ...
 ]
 
-Two entry points:
-- `replay` (C2) drives DwellEngine only -- zone_enter/zone_exit events.
-- `replay_policy` (C3) drives the full pipeline through FirePolicy --
-  zone_enter/zone_exit/squat_suspected/deterrent_fired events, plus any
-  catsentry/deterrent/fire commands the sequence produced.
+Entry point: `replay_policy` drives the full pipeline through FirePolicy --
+zone_enter/zone_exit/squat_suspected/deterrent_fired events, plus any
+catsentry/deterrent/fire commands the sequence produced. A detection-only
+golden test gets the same zone_enter/zone_exit stream as bare DwellEngine
+by passing `flags.deterrent_enabled=False` -- see test_replay.py.
 
 Usage: `catsentry-replay --config config.yaml sequence.json` prints one JSON
 line per emitted event, then one per fire command.
@@ -36,7 +36,7 @@ from catsentry.config import (
     ThresholdsConfig,
     load_config,
 )
-from catsentry.dwell import DEFAULT_MAX_MISSING_FRAMES, DwellEngine
+from catsentry.dwell import DEFAULT_MAX_MISSING_FRAMES
 from catsentry.policy import FirePolicy
 from catsentry.tracer import Detection
 from catsentry.zones import Polygon, ZoneMap
@@ -58,23 +58,6 @@ def _parse_frame(frame_idx: int, frame: dict) -> tuple[datetime, list[Detection]
         for d in frame["detections"]
     ]
     return ts, detections
-
-
-def replay(
-    zones: dict[str, Polygon],
-    thresholds: ThresholdsConfig,
-    sequence: list[dict],
-    *,
-    max_missing_frames: int = DEFAULT_MAX_MISSING_FRAMES,
-) -> list[dict]:
-    """Run a canned frame sequence through a fresh DwellEngine, in order,
-    returning every zone_enter/zone_exit event emitted."""
-    engine = DwellEngine(ZoneMap(zones), thresholds, max_missing_frames=max_missing_frames)
-    events: list[dict] = []
-    for frame_idx, frame in enumerate(sequence):
-        ts, detections = _parse_frame(frame_idx, frame)
-        events.extend(engine.update(ts, detections))
-    return events
 
 
 @dataclass(frozen=True)
