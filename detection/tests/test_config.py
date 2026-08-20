@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+import yaml
 
 from catsentry.config import BrokerConfig, ConfigError, load_config
 
@@ -54,35 +55,11 @@ def test_missing_sections_are_all_reported_together(tmp_path):
 
 
 def test_zones_missing_required_zone(tmp_path):
+    cfg = yaml.safe_load(SAMPLE_CONFIG.read_text())
+    del cfg["zones"]["floor_left"]
+    del cfg["zones"]["floor_right"]
     path = tmp_path / "zones.yaml"
-    path.write_text(
-        """
-source:
-  url: video.mp4
-broker:
-  host: localhost
-  port: 1883
-zones:
-  boxes:
-    - [0.1, 0.1]
-    - [0.2, 0.1]
-    - [0.2, 0.2]
-thresholds:
-  confidence: 0.5
-  dwell_seconds: 2
-  squat_seconds: 3
-  squat_aspect_ratio: 0.6
-  centroid_epsilon: 0.02
-  escalate_seconds: 5
-rate_limits:
-  max_fires_per_hour: 4
-  cooldown_minutes: 15
-flags:
-  deterrent_enabled: false
-ntfy:
-  topic: alerts
-"""
-    )
+    path.write_text(yaml.safe_dump(cfg))
 
     with pytest.raises(ConfigError, match=r"floor_left.*floor_right|missing required zone"):
         load_config(path)
@@ -90,42 +67,7 @@ ntfy:
 
 def test_zone_point_out_of_range(tmp_path):
     path = tmp_path / "zones.yaml"
-    path.write_text(
-        """
-source:
-  url: video.mp4
-broker:
-  host: localhost
-  port: 1883
-zones:
-  boxes:
-    - [0.1, 0.1]
-    - [1.5, 0.1]
-    - [0.2, 0.2]
-  floor_left:
-    - [0.0, 0.0]
-    - [0.1, 0.0]
-    - [0.1, 0.1]
-  floor_right:
-    - [0.0, 0.0]
-    - [0.1, 0.0]
-    - [0.1, 0.1]
-thresholds:
-  confidence: 0.5
-  dwell_seconds: 2
-  squat_seconds: 3
-  squat_aspect_ratio: 0.6
-  centroid_epsilon: 0.02
-  escalate_seconds: 5
-rate_limits:
-  max_fires_per_hour: 4
-  cooldown_minutes: 15
-flags:
-  deterrent_enabled: false
-ntfy:
-  topic: alerts
-"""
-    )
+    path.write_text(SAMPLE_CONFIG.read_text().replace("[0.60, 0.55]", "[1.5, 0.55]", 1))
 
     with pytest.raises(ConfigError, match=r"x, y in \[0, 1\]"):
         load_config(path)

@@ -82,35 +82,41 @@ def _section(raw: dict, name: str, errors: list[str]) -> dict:
     return val
 
 
-def _str(section: dict, key: str, prefix: str, errors: list[str]) -> str | None:
+# The typed getters below return a harmless placeholder ("", 0.0, False) after
+# recording an error -- the value is discarded anyway once `errors` is
+# non-empty, and non-Optional returns keep Config construction free of
+# type-ignore noise.
+
+
+def _str(section: dict, key: str, prefix: str, errors: list[str]) -> str:
     val = section.get(key)
     if not isinstance(val, str) or not val.strip():
         errors.append(f"'{prefix}.{key}': expected a non-empty string, got {val!r}")
-        return None
+        return ""
     return val
 
 
 def _num(
     section: dict, key: str, prefix: str, errors: list[str], *, positive: bool = False
-) -> float | None:
+) -> float:
     if key not in section:
         errors.append(f"'{prefix}.{key}': missing")
-        return None
+        return 0.0
     val = section[key]
     if isinstance(val, bool) or not isinstance(val, (int, float)):
         errors.append(f"'{prefix}.{key}': expected a number, got {val!r}")
-        return None
+        return 0.0
     if positive and val <= 0:
         errors.append(f"'{prefix}.{key}': must be > 0, got {val}")
-        return None
+        return 0.0
     return float(val)
 
 
-def _bool(section: dict, key: str, prefix: str, errors: list[str]) -> bool | None:
+def _bool(section: dict, key: str, prefix: str, errors: list[str]) -> bool:
     val = section.get(key)
     if not isinstance(val, bool):
         errors.append(f"'{prefix}.{key}': expected true/false, got {val!r}")
-        return None
+        return False
     return val
 
 
@@ -174,16 +180,21 @@ def load_config(path: str | Path) -> Config:
     zones = _zones(raw, errors)
 
     thresholds = _section(raw, "thresholds", errors)
-    confidence = _num(thresholds, "confidence", "thresholds", errors, positive=True)
-    if confidence is not None and not (0.0 < confidence <= 1.0):
-        errors.append(f"'thresholds.confidence': must be in (0, 1], got {confidence}")
-    dwell_seconds = _num(thresholds, "dwell_seconds", "thresholds", errors, positive=True)
-    squat_seconds = _num(thresholds, "squat_seconds", "thresholds", errors, positive=True)
-    squat_aspect_ratio = _num(
-        thresholds, "squat_aspect_ratio", "thresholds", errors, positive=True
-    )
-    centroid_epsilon = _num(thresholds, "centroid_epsilon", "thresholds", errors, positive=True)
-    escalate_seconds = _num(thresholds, "escalate_seconds", "thresholds", errors, positive=True)
+    threshold_vals = {
+        field: _num(thresholds, field, "thresholds", errors, positive=True)
+        for field in (
+            "confidence",
+            "dwell_seconds",
+            "squat_seconds",
+            "squat_aspect_ratio",
+            "centroid_epsilon",
+            "escalate_seconds",
+        )
+    }
+    if threshold_vals["confidence"] > 1.0:
+        errors.append(
+            f"'thresholds.confidence': must be in (0, 1], got {threshold_vals['confidence']}"
+        )
 
     rate_limits = _section(raw, "rate_limits", errors)
     max_fires_per_hour = _num(
@@ -202,21 +213,14 @@ def load_config(path: str | Path) -> Config:
         raise ConfigError(f"invalid config {path}:\n  - {bullets}")
 
     return Config(
-        source=SourceConfig(url=url),  # type: ignore[arg-type]
-        broker=BrokerConfig(host=host, port=int(port)),  # type: ignore[arg-type]
+        source=SourceConfig(url=url),
+        broker=BrokerConfig(host=host, port=int(port)),
         zones=zones,
-        thresholds=ThresholdsConfig(
-            confidence=confidence,  # type: ignore[arg-type]
-            dwell_seconds=dwell_seconds,  # type: ignore[arg-type]
-            squat_seconds=squat_seconds,  # type: ignore[arg-type]
-            squat_aspect_ratio=squat_aspect_ratio,  # type: ignore[arg-type]
-            centroid_epsilon=centroid_epsilon,  # type: ignore[arg-type]
-            escalate_seconds=escalate_seconds,  # type: ignore[arg-type]
-        ),
+        thresholds=ThresholdsConfig(**threshold_vals),
         rate_limits=RateLimitsConfig(
-            max_fires_per_hour=int(max_fires_per_hour),  # type: ignore[arg-type]
-            cooldown_minutes=cooldown_minutes,  # type: ignore[arg-type]
+            max_fires_per_hour=int(max_fires_per_hour),
+            cooldown_minutes=cooldown_minutes,
         ),
-        flags=FlagsConfig(deterrent_enabled=deterrent_enabled),  # type: ignore[arg-type]
-        ntfy=NtfyConfig(topic=topic),  # type: ignore[arg-type]
+        flags=FlagsConfig(deterrent_enabled=deterrent_enabled),
+        ntfy=NtfyConfig(topic=topic),
     )

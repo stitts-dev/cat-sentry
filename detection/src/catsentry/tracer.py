@@ -16,6 +16,18 @@ from ultralytics import YOLO
 
 CAT_CLASS_ID = 15  # COCO class id for "cat"
 FALLBACK_FPS = 15.0  # contract default (10-15 fps) when a source reports none
+DEFAULT_MODEL = "yolov8n.pt"  # single source of truth -- cli.py imports these
+DEFAULT_CONF = 0.5
+
+
+class SourceError(RuntimeError):
+    """A video source could not be opened or died mid-stream.
+
+    Wraps the exception families cv2/ultralytics actually raise for a bad
+    source (missing file, unreachable stream, busy webcam) so callers -- the
+    CLI now, the C5 service later -- catch one domain type instead of
+    re-deriving that list.
+    """
 
 
 @dataclass(frozen=True)
@@ -45,8 +57,8 @@ def _probe_fps(source: str | int) -> float:
 def track_cats(
     source: str | int,
     *,
-    model_path: str = "yolov8n.pt",
-    conf: float = 0.5,
+    model_path: str = DEFAULT_MODEL,
+    conf: float = DEFAULT_CONF,
     show: bool = False,
     save_path: Path | None = None,
 ) -> Iterator[list[Detection]]:
@@ -54,6 +66,7 @@ def track_cats(
 
     Opens a display window per frame if `show`; writes an annotated mp4 to
     `save_path` if given. Caller owns printing/consuming the detections.
+    Raises SourceError if the source can't be opened or dies mid-stream.
     """
     model = YOLO(model_path)
     writer: cv2.VideoWriter | None = None
@@ -75,15 +88,14 @@ def track_cats(
             detections: list[Detection] = []
             boxes = result.boxes
             if boxes is not None and boxes.id is not None:
-                for xyxy, track_id, box_conf in zip(
-                    boxes.xyxy.tolist(), boxes.id.tolist(), boxes.conf.tolist(), strict=True
-                ):
-                    x1, y1, x2, y2 = xyxy
+                # One .tolist() = one GPU->CPU sync per frame; when tracking,
+                # each row is [x1, y1, x2, y2, track_id, conf, cls].
+                for x1, y1, x2, y2, track_id, box_conf, _cls in boxes.data.tolist():
                     detections.append(
                         Detection(
                             frame_idx=frame_idx,
                             track_id=int(track_id),
-                            confidence=round(float(box_conf), 4),
+                            confidence=round(box_conf, 4),
                             bbox=(
                                 round(x1 / w, 4),
                                 round(y1 / h, 4),
@@ -110,6 +122,8 @@ def track_cats(
                         break
 
             yield detections
+    except (OSError, ConnectionError, RuntimeError) as exc:
+        raise SourceError(f"video source {source!r} failed: {exc}") from exc
     finally:
         if writer is not None:
             writer.release()

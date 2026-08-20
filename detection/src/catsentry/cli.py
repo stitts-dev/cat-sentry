@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 from catsentry.config import ConfigError, load_config
-from catsentry.tracer import parse_source, track_cats
+from catsentry.tracer import DEFAULT_CONF, DEFAULT_MODEL, SourceError, parse_source, track_cats
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -25,10 +25,15 @@ def build_parser() -> argparse.ArgumentParser:
         "--config", type=Path, help="path to config.yaml (parsed and validated in full)"
     )
     parser.add_argument(
-        "--model", default="yolov8n.pt", help="ultralytics YOLO weights (default: yolov8n.pt)"
+        "--model",
+        default=DEFAULT_MODEL,
+        help=f"ultralytics YOLO weights (default: {DEFAULT_MODEL})",
     )
     parser.add_argument(
-        "--conf", type=float, default=0.5, help="detection confidence threshold (default: 0.5)"
+        "--conf",
+        type=float,
+        default=DEFAULT_CONF,
+        help=f"detection confidence threshold (default: {DEFAULT_CONF})",
     )
     parser.add_argument("--show", action="store_true", help="render annotated playback window")
     parser.add_argument("--save", type=Path, help="write annotated video to this mp4 path")
@@ -71,12 +76,8 @@ def main(argv: list[str] | None = None) -> int:
                     f"frame={d.frame_idx} track_id={d.track_id} "
                     f"conf={d.confidence:.2f} bbox={list(d.bbox)}"
                 )
-    except (OSError, ConnectionError, RuntimeError) as exc:
-        # ponytail: catch the exception families cv2/ultralytics actually
-        # raise for a bad source (missing file, unreachable stream, busy
-        # webcam) rather than a fully general `except Exception` -- a real
-        # bug in our own code should still surface as a traceback.
-        print(f"error opening source {source!r}: {exc}", file=sys.stderr)
+    except SourceError as exc:
+        print(f"error: {exc}", file=sys.stderr)
         return 1
 
     print(f"done: {frame_count} frames, {detection_count} cat detections", file=sys.stderr)
