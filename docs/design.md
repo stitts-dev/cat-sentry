@@ -83,6 +83,11 @@ Python 3.11+, `uv`-managed. Deps: `ultralytics` (YOLO), `opencv-python`,
 9. **Config** — single `config.yaml`: source URL, broker, zones, thresholds,
    rate limits, ntfy topic.
 
+Threading model: MqttPublisher is non-blocking (paho background thread);
+EventStore.save and NtfyNotifier.notify are synchronous by design — the C5
+service runs them on a single worker thread fed by a queue, never inline on
+the frame loop.
+
 ### Phase 2 (not this weekend)
 - Per-cat ID: classifier on bbox crops. Training data: worldsim domain-randomized
   synthetic + accumulated real snapshots. Fills `cat_id` in events.

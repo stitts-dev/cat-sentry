@@ -17,14 +17,14 @@ from catsentry.config import NtfyConfig
 
 NTFY_BASE_URL = "https://ntfy.sh"
 
-# Event types worth interrupting a human for; see docs/contract-catsentry-v1.md
-# for the full `catsentry/event` type list.
-NOTIFY_EVENT_TYPES = frozenset({"squat_suspected", "deterrent_fired"})
-
+# Event types worth interrupting a human for, each mapped to its ntfy title;
+# see docs/contract-catsentry-v1.md for the full `catsentry/event` type list.
 _TITLES = {
     "squat_suspected": "Cat Sentry: squat suspected",
     "deterrent_fired": "Cat Sentry: deterrent fired",
 }
+
+NOTIFY_EVENT_TYPES = frozenset(_TITLES)
 
 
 class NtfyNotifier:
@@ -41,7 +41,11 @@ class NtfyNotifier:
     def notify(self, event: dict) -> bool:
         """Push `event` if its type is worth alerting on. Returns whether a
         push was attempted and accepted; never raises -- a dead network
-        shouldn't take detection down."""
+        shouldn't take detection down.
+
+        Expects the event dict returned by store.save(), so snapshot_path is
+        already filled in (wiring order: policy -> store.save -> mqtt/notify).
+        """
         event_type = event.get("type")
         if event_type not in NOTIFY_EVENT_TYPES:
             return False
@@ -59,7 +63,7 @@ class NtfyNotifier:
 
         request = urllib.request.Request(self._url, data=data, headers=headers)
         try:
-            with self._opener.open(request, timeout=10) as response:
+            with self._opener.open(request, timeout=3) as response:
                 return 200 <= response.status < 300
         except (urllib.error.URLError, OSError):
             return False

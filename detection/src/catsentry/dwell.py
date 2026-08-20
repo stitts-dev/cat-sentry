@@ -116,6 +116,13 @@ class DwellEngine:
             return None
         return state.confirmed_zone
 
+    def reset(self) -> None:
+        """Drop all per-track state. For a stream reconnect, where the next
+        frame's ts can jump arbitrarily far from the last one seen -- letting
+        that jump flow into dwell arithmetic for tracks that predate the
+        reconnect would be meaningless."""
+        self._tracks.clear()
+
     def update(self, ts: datetime, detections: list[Detection]) -> list[dict]:
         events: list[dict] = []
         seen_ids = {d.track_id for d in detections if d.track_id is not None}
@@ -162,9 +169,6 @@ class DwellEngine:
             )
             state.confirmed_zone = None
             state.entered_at = None
-            state.candidate_zone = None
-            state.candidate_since = None
-            state.candidate_detection = None
 
         if state.confirmed_zone is None:
             if raw_zone is None:

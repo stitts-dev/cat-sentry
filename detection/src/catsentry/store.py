@@ -73,7 +73,7 @@ class EventStore:
     def save(self, event: dict, frame: np.ndarray | None = None) -> dict:
         event = dict(event)
         if frame is not None:
-            ts = datetime.strptime(event["ts"], "%Y-%m-%dT%H:%M:%SZ")
+            ts = datetime.fromisoformat(event["ts"])
             snapshot_path = _write_snapshot(frame, self._events_dir, ts)
             event["snapshot_path"] = snapshot_path.as_posix()
 

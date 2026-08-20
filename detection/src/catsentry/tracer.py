@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import cv2
+import numpy as np
 from ultralytics import YOLO
 
 CAT_CLASS_ID = 15  # COCO class id for "cat"
@@ -61,8 +62,11 @@ def track_cats(
     conf: float = DEFAULT_CONF,
     show: bool = False,
     save_path: Path | None = None,
-) -> Iterator[list[Detection]]:
-    """Yield the list of cat detections for each frame of `source`.
+) -> Iterator[tuple[np.ndarray, list[Detection]]]:
+    """Yield `(frame, detections)` for each frame of `source`. `frame` is the
+    raw BGR frame (`result.orig_img`) so callers -- C5's EventStore -- can
+    hand it straight to a snapshot write; `detections` is that frame's cat
+    detections.
 
     Opens a display window per frame if `show`; writes an annotated mp4 to
     `save_path` if given. Caller owns printing/consuming the detections.
@@ -121,7 +125,7 @@ def track_cats(
                     if cv2.waitKey(1) & 0xFF == ord("q"):
                         break
 
-            yield detections
+            yield result.orig_img, detections
     except (OSError, ConnectionError, RuntimeError) as exc:
         raise SourceError(f"video source {source!r} failed: {exc}") from exc
     finally:

@@ -53,3 +53,7 @@ flags:
 
 ntfy:
   topic: "catsentry-alerts"
+
+store:
+  db_path: "events.db"
+  events_dir: "events"

@@ -1,7 +1,7 @@
 """config.yaml loading + validation.
 
 Validates every field named in docs/design.md (source, broker, zones,
-thresholds, rate_limits, flags, ntfy). catsentry.zones/catsentry.dwell (C2)
+thresholds, rate_limits, flags, ntfy, store). catsentry.zones/catsentry.dwell (C2)
 consume `zones` and `thresholds.dwell_seconds`; the C1 tracer CLI only
 consumes `source.url` so far.
 
@@ -62,6 +62,12 @@ class NtfyConfig:
 
 
 @dataclass(frozen=True)
+class StoreConfig:
+    db_path: str
+    events_dir: str
+
+
+@dataclass(frozen=True)
 class Config:
     source: SourceConfig
     broker: BrokerConfig
@@ -70,6 +76,7 @@ class Config:
     rate_limits: RateLimitsConfig
     flags: FlagsConfig
     ntfy: NtfyConfig
+    store: StoreConfig
 
 
 def _section(raw: dict, name: str, errors: list[str]) -> dict:
@@ -209,6 +216,10 @@ def load_config(path: str | Path) -> Config:
     ntfy = _section(raw, "ntfy", errors)
     topic = _str(ntfy, "topic", "ntfy", errors)
 
+    store = _section(raw, "store", errors)
+    db_path = _str(store, "db_path", "store", errors)
+    events_dir = _str(store, "events_dir", "store", errors)
+
     if errors:
         bullets = "\n  - ".join(errors)
         raise ConfigError(f"invalid config {path}:\n  - {bullets}")
@@ -224,4 +235,5 @@ def load_config(path: str | Path) -> Config:
         ),
         flags=FlagsConfig(deterrent_enabled=deterrent_enabled),
         ntfy=NtfyConfig(topic=topic),
+        store=StoreConfig(db_path=db_path, events_dir=events_dir),
     )

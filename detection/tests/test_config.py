@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from catsentry.config import BrokerConfig, ConfigError, load_config
+from catsentry.config import BrokerConfig, ConfigError, StoreConfig, load_config
 
 SAMPLE_CONFIG = Path(__file__).resolve().parent.parent / "config.sample.yaml"
 
@@ -19,6 +19,7 @@ def test_sample_config_loads_and_validates():
     assert cfg.rate_limits.max_fires_per_hour == 4
     assert cfg.flags.deterrent_enabled is False
     assert cfg.ntfy.topic == "catsentry-alerts"
+    assert cfg.store == StoreConfig(db_path="events.db", events_dir="events")
 
 
 def test_missing_file_raises_config_error(tmp_path):
@@ -50,7 +51,15 @@ def test_missing_sections_are_all_reported_together(tmp_path):
         load_config(path)
 
     message = str(exc_info.value)
-    for expected in ("'broker'", "'zones'", "'thresholds'", "'rate_limits'", "'flags'", "'ntfy'"):
+    for expected in (
+        "'broker'",
+        "'zones'",
+        "'thresholds'",
+        "'rate_limits'",
+        "'flags'",
+        "'ntfy'",
+        "'store'",
+    ):
         assert expected in message
 
 

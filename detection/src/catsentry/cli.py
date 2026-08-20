@@ -62,7 +62,7 @@ def main(argv: list[str] | None = None) -> int:
     frame_count = 0
     detection_count = 0
     try:
-        for detections in track_cats(
+        for _frame, detections in track_cats(
             parse_source(source),
             model_path=args.model,
             conf=args.conf,

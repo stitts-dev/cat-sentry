@@ -164,3 +164,19 @@ def test_dwell_seconds_helper_is_none_until_confirmed():
 
     engine.update(ts(0), [det(1, BBOX_A)])
     assert engine.dwell_seconds(1, ts(1)) is None  # still just a candidate, not confirmed
+
+
+def test_reset_clears_all_track_state():
+    engine = make_engine(dwell_seconds=1.0)
+    engine.update(ts(0), [det(1, BBOX_A)])
+    engine.update(ts(1), [det(1, BBOX_A)])  # confirms
+    assert engine.confirmed_zone(1) == "zone_a"
+
+    engine.reset()
+
+    assert engine.confirmed_zone(1) is None
+    assert engine.dwell_seconds(1, ts(1)) is None
+    # A sighting right after reset needs a fresh full dwell period, exactly
+    # like a track's first-ever contact -- proving no stale state survived.
+    events = engine.update(ts(1), [det(1, BBOX_A)])
+    assert events == []

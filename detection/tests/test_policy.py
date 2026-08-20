@@ -215,6 +215,32 @@ def test_rail_violation_reasons_are_specific():
     assert violation is not None and "protected" in violation
 
 
+def test_reset_clears_per_track_state_but_preserves_global_rate_limit_history():
+    thresholds = _fast_thresholds()  # dwell=1, squat=1
+    rate_limits = RateLimitsConfig(max_fires_per_hour=10, cooldown_minutes=5.0)
+    flags = FlagsConfig(deterrent_enabled=True)
+    policy = FirePolicy(ZoneMap(FAST_ZONES), thresholds, rate_limits, flags, max_missing_frames=1)
+
+    policy.update(ts(0), [det(1, SQUAT_BBOX)])
+    policy.update(ts(1), [det(1, SQUAT_BBOX)])  # confirms IN_ZONE
+    _, fires = policy.update(ts(2), [det(1, SQUAT_BBOX)])  # confirms SUSPECT, sound fires
+    assert len(fires) == 1
+    assert policy.track_state(1) == TrackState.WARNED
+
+    policy.reset()
+
+    assert policy.track_state(1) is None  # per-track policy state cleared
+    assert policy.dwell_seconds(1, ts(2)) is None  # dwell engine cleared too
+
+    # A different track's sound attempt right after reset is still blocked
+    # by the global cooldown the pre-reset fire started -- the safety rail
+    # survives the reconnect that reset() is for.
+    policy.update(ts(2), [det(2, SQUAT_BBOX)])
+    policy.update(ts(3), [det(2, SQUAT_BBOX)])  # confirms IN_ZONE
+    _, fires_after_reset = policy.update(ts(4), [det(2, SQUAT_BBOX)])  # confirms SUSPECT
+    assert fires_after_reset == []  # blocked by the surviving global cooldown
+
+
 def test_protected_zone_point_in_polygon_sanity_matches_sample_config():
     # Cheap cross-check that the protected-zone fixture's bbox really does
     # land inside "boxes" per config.sample.yaml -- if this ever drifts the

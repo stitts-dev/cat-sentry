@@ -71,6 +71,18 @@ class _PolicyTrackState:
     squat_start_detection: Detection | None = None  # for backdated squat_suspected events
     warned_at: datetime | None = None  # ts the sound command was attempted
 
+    def clear_squat(self) -> None:
+        """Drop any squat candidacy -- the shape/stillness condition broke."""
+        self.squat_since = None
+        self.squat_anchor = None
+        self.squat_start_detection = None
+
+    def start_squat(self, ts: datetime, centroid: tuple[float, float], det: Detection) -> None:
+        """Begin a fresh squat candidacy anchored at this frame."""
+        self.squat_since = ts
+        self.squat_anchor = centroid
+        self.squat_start_detection = det
+
 
 def _aspect_ratio(bbox: tuple[float, float, float, float]) -> float:
     _, _, w, h = bbox
@@ -138,8 +150,16 @@ class FirePolicy:
         state = self._tracks.get(track_id)
         return state.state if state is not None else None
 
+    def reset(self) -> None:
+        """Drop all per-track policy state and the dwell engine's, for a
+        stream reconnect -- see DwellEngine.reset. The global rate-limit
+        history (`_fire_log`/`_last_fire_at`) is deliberately kept: the
+        safety rails must survive a reconnect, not reset with it."""
+        self._tracks.clear()
+        self._dwell.reset()
+
     def update(self, ts: datetime, detections: list[Detection]) -> tuple[list[dict], list[dict]]:
-        events = list(self._dwell.update(ts, detections))
+        events = self._dwell.update(ts, detections)
         fires: list[dict] = []
 
         # Drop policy memory for any track no longer confirmed IN_ZONE
@@ -230,9 +250,9 @@ class FirePolicy:
 
         if pstate.state == TrackState.IN_ZONE:
             if not (is_squat_shape and holding_still):
-                pstate.squat_since = ts if is_squat_shape else None
-                pstate.squat_anchor = centroid if is_squat_shape else None
-                pstate.squat_start_detection = det if is_squat_shape else None
+                pstate.clear_squat()
+                if is_squat_shape:
+                    pstate.start_squat(ts, centroid, det)
                 return events
 
             elapsed = (ts - pstate.squat_since).total_seconds()
@@ -272,9 +292,9 @@ class FirePolicy:
                 # the global cooldown rail (not this state) is what stops a
                 # too-soon re-fire.
                 pstate.state = TrackState.IN_ZONE
-                pstate.squat_since = ts if is_squat_shape else None
-                pstate.squat_anchor = centroid if is_squat_shape else None
-                pstate.squat_start_detection = det if is_squat_shape else None
+                pstate.clear_squat()
+                if is_squat_shape:
+                    pstate.start_squat(ts, centroid, det)
                 return events
 
             elapsed = (ts - pstate.warned_at).total_seconds()
@@ -306,8 +326,8 @@ class FirePolicy:
             )
             if cooled_down:
                 pstate.state = TrackState.IN_ZONE
-                pstate.squat_since = None
-                pstate.squat_anchor = None
-                pstate.squat_start_detection = None
+                pstate.clear_squat()
+                if is_squat_shape:
+                    pstate.start_squat(ts, centroid, det)
 
         return events

@@ -28,8 +28,10 @@ def test_parse_source_leaves_paths_and_urls_as_strings():
 @pytest.mark.integration
 @pytest.mark.skipif(not FIXTURE_CLIP.exists(), reason="run scripts/download_fixtures.py first")
 def test_track_cats_finds_a_cat_in_fixture_clip():
-    all_detections = [d for frame in track_cats(str(FIXTURE_CLIP)) for d in frame]
+    frames_and_detections = list(track_cats(str(FIXTURE_CLIP)))
+    all_detections = [d for _frame, detections in frames_and_detections for d in detections]
 
+    assert all(frame.ndim == 3 for frame, _detections in frames_and_detections)
     assert len(all_detections) > 0
     assert all(d.track_id is not None for d in all_detections)
     assert all(0.0 <= d.confidence <= 1.0 for d in all_detections)
