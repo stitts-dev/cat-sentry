@@ -63,7 +63,11 @@ class EventStore:
 
     def __init__(self, db_path: str | Path, events_dir: str | Path = "events") -> None:
         self._events_dir = Path(events_dir)
-        self._conn = sqlite3.connect(db_path)
+        # check_same_thread=False: the service constructs the store on the
+        # main thread but only its output worker thread ever calls save()/
+        # close() -- single-writer access, no locking needed. Without this,
+        # sqlite3 raises ProgrammingError on the first cross-thread save.
+        self._conn = sqlite3.connect(db_path, check_same_thread=False)
         self._conn.execute(SCHEMA)
         self._conn.commit()
 
